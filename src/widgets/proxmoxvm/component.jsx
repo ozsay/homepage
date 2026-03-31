@@ -1,14 +1,17 @@
 import Block from "components/services/widget/block";
 import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next";
-import useSWR from "swr";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 
 export default function ProxmoxVM({ service }) {
   const { t } = useTranslation();
 
   const { widget } = service;
 
-  const { data, error } = useSWR(`/api/proxmox/stats/${widget.node}/${widget.vmid}?type=${widget.type || "qemu"}`);
+  const { data, error } = useWidgetWS(
+    `status:proxmox:${widget.node}:${widget.vmid}`,
+    `/api/proxmox/stats/${widget.node}/${widget.vmid}?type=${widget.type || "qemu"}`,
+  );
 
   if (error) {
     return <Container service={service} error={error} />;

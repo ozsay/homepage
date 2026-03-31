@@ -49,6 +49,10 @@ COPY --link --chmod=755 docker-entrypoint.sh /usr/local/bin/
 COPY --link --from=builder --chown=1000:1000 /app/.next/standalone/ ./
 COPY --link --from=builder --chown=1000:1000 /app/.next/static/ ./.next/static
 
+# Copy custom WebSocket server (overrides standalone server.js)
+COPY --link --chown=1000:1000 server.js ./server.js
+COPY --link --chown=1000:1000 src/server/ ./src/server/
+
 RUN apk add --no-cache su-exec iputils-ping shadow
 
 USER root

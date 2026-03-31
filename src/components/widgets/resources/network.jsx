@@ -1,6 +1,6 @@
 import { useTranslation } from "next-i18next";
 import { FaNetworkWired } from "react-icons/fa";
-import useSWR from "swr";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 
 import Error from "../widget/error";
 import Resource from "../widget/resource";
@@ -10,9 +10,11 @@ export default function Network({ options, refresh = 1500 }) {
   // eslint-disable-next-line no-param-reassign
   if (options.network === true) options.network = "default";
 
-  const { data, error } = useSWR(`/api/widgets/resources?type=network&interfaceName=${options.network}`, {
-    refreshInterval: refresh,
-  });
+  const { data, error } = useWidgetWS(
+    `resource:network:${options.network}`,
+    `/api/widgets/resources?type=network&interfaceName=${options.network}`,
+    { refreshInterval: refresh },
+  );
 
   if (error || data?.error) {
     return <Error />;

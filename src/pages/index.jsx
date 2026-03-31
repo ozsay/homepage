@@ -16,6 +16,7 @@ import Script from "next/script";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { BiError } from "react-icons/bi";
 import useSWR, { SWRConfig } from "swr";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 import { ColorContext } from "utils/contexts/color";
 import { SettingsContext } from "utils/contexts/settings";
 import { TabContext } from "utils/contexts/tab";
@@ -99,7 +100,7 @@ function Index({ initialSettings, fallback }) {
   const [stale, setStale] = useState(false);
   const { data: errorsData } = useSWR("/api/validate");
   const { error: validateError } = errorsData || {};
-  const { data: hashData, mutate: mutateHash } = useSWR("/api/hash");
+  const { data: hashData, mutate: mutateHash } = useWidgetWS("config:hash", "/api/hash");
 
   useEffect(() => {
     if (windowFocused) {

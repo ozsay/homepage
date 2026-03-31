@@ -1,7 +1,7 @@
 import Block from "components/services/widget/block";
 import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next";
-import useSWR from "swr";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 
 import { calculateCPUPercent, calculateThroughput, calculateUsedMemory } from "./stats-helpers";
 
@@ -10,11 +10,15 @@ export default function Component({ service }) {
 
   const { widget } = service;
 
-  const { data: statusData, error: statusError } = useSWR(
+  const { data: statusData, error: statusError } = useWidgetWS(
+    `status:docker:${widget.container}:${widget.server || ""}`,
     `/api/docker/status/${widget.container}/${widget.server || ""}`,
   );
 
-  const { data: statsData, error: statsError } = useSWR(`/api/docker/stats/${widget.container}/${widget.server || ""}`);
+  const { data: statsData, error: statsError } = useWidgetWS(
+    `status:docker-stats:${widget.container}:${widget.server || ""}`,
+    `/api/docker/stats/${widget.container}/${widget.server || ""}`,
+  );
 
   if (statsError || statsData?.error || statusError || statusData?.error) {
     const finalError = statsError ?? statsData?.error ?? statusError ?? statusData?.error;

@@ -1,9 +1,12 @@
 import { t } from "i18next";
-import useSWR from "swr";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 
 export default function KubernetesStatus({ service, style }) {
   const podSelectorString = service.podSelector !== undefined ? `podSelector=${service.podSelector}` : "";
-  const { data, error } = useSWR(`/api/kubernetes/status/${service.namespace}/${service.app}?${podSelectorString}`);
+  const { data, error } = useWidgetWS(
+    `status:kubernetes:${service.namespace}:${service.app}`,
+    `/api/kubernetes/status/${service.namespace}/${service.app}?${podSelectorString}`,
+  );
 
   let statusLabel = t("docker.unknown");
   let statusTitle = "";

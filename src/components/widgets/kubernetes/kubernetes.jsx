@@ -1,5 +1,5 @@
 import { useTranslation } from "next-i18next";
-import useSWR from "swr";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 
 import Container from "../widget/container";
 import Error from "../widget/error";
@@ -25,7 +25,8 @@ export default function Widget({ options }) {
     },
   };
 
-  const { data, error } = useSWR(`/api/widgets/kubernetes?${new URLSearchParams({ lang: i18n.language }).toString()}`, {
+  const qs = new URLSearchParams({ lang: i18n.language }).toString();
+  const { data, error } = useWidgetWS(`kubernetes:${qs}`, `/api/widgets/kubernetes?${qs}`, {
     refreshInterval: 1500,
   });
 

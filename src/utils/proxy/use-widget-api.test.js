@@ -1,9 +1,12 @@
+// @vitest-environment jsdom
+
+import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { useSWR } = vi.hoisted(() => ({ useSWR: vi.fn() }));
+const { useWidgetWS } = vi.hoisted(() => ({ useWidgetWS: vi.fn() }));
 
-vi.mock("swr", () => ({
-  default: useSWR,
+vi.mock("./use-widget-ws", () => ({
+  default: useWidgetWS,
 }));
 
 import useWidgetAPI from "./use-widget-api";
@@ -14,36 +17,37 @@ describe("utils/proxy/use-widget-api", () => {
   });
 
   it("formats the proxy url and passes refreshInterval when provided in options", () => {
-    useSWR.mockReturnValue({ data: { ok: true }, error: undefined, mutate: "m" });
+    useWidgetWS.mockReturnValue({ data: { ok: true }, error: undefined, mutate: "m" });
 
     const widget = { service_group: "g", service_name: "s", index: 0 };
-    const result = useWidgetAPI(widget, "status", { refreshInterval: 123, foo: "bar" });
+    const { result } = renderHook(() => useWidgetAPI(widget, "status", { refreshInterval: 123, foo: "bar" }));
 
-    expect(useSWR).toHaveBeenCalledWith(
+    expect(useWidgetWS).toHaveBeenCalledWith(
+      "proxy:g:s:0:status",
       expect.stringContaining("/api/services/proxy?"),
       expect.objectContaining({ refreshInterval: 123 }),
     );
-    expect(result.data).toEqual({ ok: true });
-    expect(result.error).toBeUndefined();
-    expect(result.mutate).toBe("m");
+    expect(result.current.data).toEqual({ ok: true });
+    expect(result.current.error).toBeUndefined();
+    expect(result.current.mutate).toBe("m");
   });
 
   it("returns data.error as the top-level error", () => {
     const dataError = { message: "nope" };
-    useSWR.mockReturnValue({ data: { error: dataError }, error: undefined, mutate: vi.fn() });
+    useWidgetWS.mockReturnValue({ data: { error: dataError }, error: undefined, mutate: vi.fn() });
 
     const widget = { service_group: "g", service_name: "s", index: 0 };
-    const result = useWidgetAPI(widget, "status", {});
+    const { result } = renderHook(() => useWidgetAPI(widget, "status", {}));
 
-    expect(result.error).toBe(dataError);
+    expect(result.current.error).toBe(dataError);
   });
 
   it("disables the request when endpoint is an empty string", () => {
-    useSWR.mockReturnValue({ data: undefined, error: undefined, mutate: vi.fn() });
+    useWidgetWS.mockReturnValue({ data: undefined, error: undefined, mutate: vi.fn() });
 
     const widget = { service_group: "g", service_name: "s", index: 0 };
-    useWidgetAPI(widget, "");
+    renderHook(() => useWidgetAPI(widget, ""));
 
-    expect(useSWR).toHaveBeenCalledWith(null, {});
+    expect(useWidgetWS).toHaveBeenCalledWith(null, null, { refreshInterval: undefined });
   });
 });

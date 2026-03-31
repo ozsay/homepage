@@ -1,11 +1,13 @@
 import { useTranslation } from "next-i18next";
-import useSWR from "swr";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 
 export default function Ping({ groupName, serviceName, style }) {
   const { t } = useTranslation();
-  const { data, error } = useSWR(`/api/ping?${new URLSearchParams({ groupName, serviceName }).toString()}`, {
-    refreshInterval: 30000,
-  });
+  const { data, error } = useWidgetWS(
+    `service:ping:${groupName}:${serviceName}`,
+    `/api/ping?${new URLSearchParams({ groupName, serviceName }).toString()}`,
+    { refreshInterval: 30000 },
+  );
 
   let colorClass = "text-black/20 dark:text-white/40 opacity-20";
   let backgroundClass = "bg-theme-500/10 dark:bg-theme-900/50 px-1.5 py-0.5";

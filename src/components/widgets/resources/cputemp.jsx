@@ -1,6 +1,6 @@
 import { useTranslation } from "next-i18next";
 import { FaThermometerHalf } from "react-icons/fa";
-import useSWR from "swr";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 
 import Error from "../widget/error";
 import Resource from "../widget/resource";
@@ -12,7 +12,7 @@ function convertToFahrenheit(t) {
 export default function CpuTemp({ expanded, units, refresh = 1500, tempmin = 0, tempmax = -1 }) {
   const { t } = useTranslation();
 
-  const { data, error } = useSWR(`/api/widgets/resources?type=cputemp`, {
+  const { data, error } = useWidgetWS("resource:cputemp", `/api/widgets/resources?type=cputemp`, {
     refreshInterval: refresh,
   });
 

@@ -22,7 +22,6 @@ jobs:
 
   build:
     name: Docker Build & Push
-    if: github.repository == 'gethomepage/homepage'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -38,7 +37,6 @@ jobs:
         uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
         with:
           images: |
-            ${{ env.IMAGE_NAME }}
             ghcr.io/${{ env.IMAGE_NAME }}
           tags: |
             # Default tags
@@ -82,7 +80,7 @@ jobs:
           NEXT_PUBLIC_REVISION="${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}" \
           pnpm run build
 
-      - name: Log into registry ${{ env.REGISTRY }}
+      - name: Log into GHCR
         if: github.event_name != 'pull_request'
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:

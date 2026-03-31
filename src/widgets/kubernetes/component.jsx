@@ -1,18 +1,20 @@
 import Block from "components/services/widget/block";
 import Container from "components/services/widget/container";
 import { useTranslation } from "next-i18next";
-import useSWR from "swr";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 
 export default function Component({ service }) {
   const { t } = useTranslation();
 
   const { widget } = service;
   const podSelectorString = widget.podSelector !== undefined ? `podSelector=${widget.podSelector}` : "";
-  const { data: statusData, error: statusError } = useSWR(
+  const { data: statusData, error: statusError } = useWidgetWS(
+    `status:kubernetes:${widget.namespace}:${widget.app}`,
     `/api/kubernetes/status/${widget.namespace}/${widget.app}?${podSelectorString}`,
   );
 
-  const { data: statsData, error: statsError } = useSWR(
+  const { data: statsData, error: statsError } = useWidgetWS(
+    `status:kubernetes:${widget.namespace}:${widget.app}:stats`,
     `/api/kubernetes/stats/${widget.namespace}/${widget.app}?${podSelectorString}`,
   );
 

@@ -1,10 +1,10 @@
 import classNames from "classnames";
 import { useTranslation } from "next-i18next";
-import { useContext } from "react";
+import { useContext, useMemo } from "react";
 import { FaMemory, FaRegClock, FaThermometerHalf } from "react-icons/fa";
 import { FiCpu, FiHardDrive } from "react-icons/fi";
-import useSWR from "swr";
 import { SettingsContext } from "utils/contexts/settings";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 
 import Error from "../widget/error";
 import Resource from "../widget/resource";
@@ -26,12 +26,14 @@ export default function Widget({ options }) {
   const { settings } = useContext(SettingsContext);
   const diskUnits = options.diskUnits === "bbytes" ? "common.bbytes" : "common.bytes";
 
-  const { data, error } = useSWR(
-    `/api/widgets/glances?${new URLSearchParams({ lang: i18n.language, ...options }).toString()}`,
-    {
-      refreshInterval: 1500,
-    },
+  const qs = useMemo(
+    () => new URLSearchParams({ lang: i18n.language, ...options }).toString(),
+    [i18n.language, options],
   );
+
+  const { data, error } = useWidgetWS(`glances:${qs}`, `/api/widgets/glances?${qs}`, {
+    refreshInterval: 1500,
+  });
 
   if (error || data?.error) {
     return <Error options={options} />;

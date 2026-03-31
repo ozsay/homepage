@@ -2,7 +2,7 @@ import { useTranslation } from "next-i18next";
 import { useCallback, useEffect, useState } from "react";
 import { MdLocationDisabled, MdLocationSearching } from "react-icons/md";
 import { WiCloudDown } from "react-icons/wi";
-import useSWR from "swr";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 
 import mapIcon from "../../../utils/weather/openmeteo-condition-map";
 import Container from "../widget/container";
@@ -15,7 +15,8 @@ import WidgetIcon from "../widget/widget_icon";
 function Widget({ options }) {
   const { t } = useTranslation();
 
-  const { data, error } = useSWR(`/api/widgets/openmeteo?${new URLSearchParams({ ...options }).toString()}`);
+  const qs = new URLSearchParams({ ...options }).toString();
+  const { data, error } = useWidgetWS(`weather:openmeteo:${qs}`, `/api/widgets/openmeteo?${qs}`);
 
   if (error || data?.error) {
     return <Error options={options} />;

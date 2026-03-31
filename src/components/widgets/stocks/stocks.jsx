@@ -1,7 +1,7 @@
 import { useTranslation } from "next-i18next";
 import { useState } from "react";
 import { FaChartLine } from "react-icons/fa6";
-import useSWR from "swr";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 
 import Container from "../widget/container";
 import Error from "../widget/error";
@@ -16,8 +16,8 @@ export default function Widget({ options }) {
 
   const { color } = options;
 
-  const { data, error } = useSWR(
-    `/api/widgets/stocks?${new URLSearchParams({ lang: i18n.language, ...options }).toString()}`,
+  const qs = new URLSearchParams({ lang: i18n.language, ...options }).toString();
+  const { data, error } = useWidgetWS(`stocks:${qs}`, `/api/widgets/stocks?${qs}`,
   );
 
   if (error || data?.error) {

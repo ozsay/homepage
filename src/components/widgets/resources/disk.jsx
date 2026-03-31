@@ -1,6 +1,6 @@
 import { useTranslation } from "next-i18next";
 import { FiHardDrive } from "react-icons/fi";
-import useSWR from "swr";
+import useWidgetWS from "utils/proxy/use-widget-ws";
 
 import Error from "../widget/error";
 import Resource from "../widget/resource";
@@ -9,9 +9,11 @@ export default function Disk({ options, expanded, diskUnits, refresh = 1500 }) {
   const { t } = useTranslation();
   const diskUnitsName = diskUnits === "bbytes" ? "common.bbytes" : "common.bytes";
 
-  const { data, error } = useSWR(`/api/widgets/resources?type=disk&target=${options.disk}`, {
-    refreshInterval: refresh,
-  });
+  const { data, error } = useWidgetWS(
+    `resource:disk:${options.disk}`,
+    `/api/widgets/resources?type=disk&target=${options.disk}`,
+    { refreshInterval: refresh },
+  );
 
   if (error || data?.error) {
     return <Error options={options} />;
