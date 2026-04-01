@@ -16,6 +16,7 @@ const DEFAULT_INTERVALS = {
   "service:ping": 30000,
   "service:siteMonitor": 30000,
   proxy: 10000,
+  "docker:containers": 10000,
   "status:docker": 30000,
   "status:docker-stats": 30000,
   "status:kubernetes": 30000,
@@ -93,6 +94,11 @@ function topicToURL(topic) {
 
   if (parts[0] === "longhorn") {
     return `/api/widgets/longhorn`;
+  }
+
+  if (parts[0] === "docker" && parts[1] === "containers") {
+    const server = parts[2] || "";
+    return `/api/docker/containers?server=${encodeURIComponent(server)}`;
   }
 
   if (parts[0] === "service") {
