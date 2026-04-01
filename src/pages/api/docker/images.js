@@ -24,11 +24,13 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "query failed" });
     }
 
-    // Count how many containers use each image
-    const imageUsage = {};
+    // Map image ID -> list of container names using it
+    const imageContainers = {};
     for (const c of containers) {
       const imageId = c.ImageID;
-      imageUsage[imageId] = (imageUsage[imageId] || 0) + 1;
+      const name = c.Names?.[0]?.replace(/^\//, "") ?? c.Id.slice(0, 12);
+      if (!imageContainers[imageId]) imageContainers[imageId] = [];
+      imageContainers[imageId].push(name);
     }
 
     const result = images.map((img) => ({
@@ -37,7 +39,8 @@ export default async function handler(req, res) {
       repoDigests: img.RepoDigests || [],
       size: img.Size,
       created: img.Created,
-      usedBy: imageUsage[img.Id] || 0,
+      usedBy: imageContainers[img.Id]?.length || 0,
+      containers: imageContainers[img.Id] || [],
     }));
 
     return res.status(200).json(result);

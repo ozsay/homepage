@@ -45,28 +45,36 @@ function NetworkContent({ network }) {
           {network.subnet && <KV label="Subnet" value={network.subnet} />}
           {network.gateway && <KV label="Gateway" value={network.gateway} />}
         </Section>
-        {network.containers?.length > 0 && (
-          <Section title={`Connected Containers (${network.containers.length})`}>
-            {network.containers.map((c) => (
+        <Section title={`Containers (${network.containers?.length || 0})`}>
+          {network.containers?.length > 0 ? (
+            network.containers.map((c) => (
               <div key={c.id} className="flex gap-2 py-0.5">
                 <span className="font-medium text-theme-600 dark:text-theme-300">{c.name}</span>
                 <span>{c.ip}</span>
               </div>
-            ))}
-          </Section>
-        )}
+            ))
+          ) : (
+            <div className="text-theme-400 italic">No containers connected</div>
+          )}
+        </Section>
       </div>
     </div>
   );
 }
 
 export default function NetworksGroup({ icon, server }) {
-  const [selected, setSelected] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
   const [filter, setFilter] = useState("");
 
   const topic = `docker:networks:${server}`;
   const fallbackUrl = `/api/docker/networks?server=${encodeURIComponent(server)}`;
   const { data: networks } = useWidgetWS(topic, fallbackUrl);
+
+  // Resolve selected from current data so it stays fresh on poll updates
+  const selected = useMemo(
+    () => (Array.isArray(networks) ? networks.find((n) => n.id === selectedId) : null),
+    [networks, selectedId],
+  );
 
   const filtered = useMemo(() => {
     if (!Array.isArray(networks)) return [];
@@ -99,11 +107,11 @@ export default function NetworksGroup({ icon, server }) {
                   type="button"
                   className={classNames(
                     "w-full text-left px-3 py-2 cursor-pointer rounded transition-colors",
-                    selected?.id === n.id
+                    selectedId === n.id
                       ? "bg-theme-300/20 dark:bg-white/10"
                       : "hover:bg-theme-200/20 dark:hover:bg-white/5",
                   )}
-                  onClick={() => setSelected(n)}
+                  onClick={() => setSelectedId(n.id)}
                 >
                   <span className="text-sm font-medium truncate block text-theme-700 dark:text-theme-200">{n.name}</span>
                   <span className="text-xs text-theme-500 dark:text-theme-400">

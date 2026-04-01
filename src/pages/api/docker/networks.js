@@ -15,13 +15,18 @@ export default async function handler(req, res) {
     }
 
     const docker = new Docker(dockerArgs.conn || dockerArgs);
-    const networks = await docker.listNetworks();
+    const networkList = await docker.listNetworks();
 
-    if (!Array.isArray(networks)) {
+    if (!Array.isArray(networkList)) {
       return res.status(500).json({ error: "query failed" });
     }
 
-    const result = networks.map((n) => {
+    // Inspect each network to get connected containers
+    const inspected = await Promise.all(
+      networkList.map((n) => docker.getNetwork(n.Id).inspect()),
+    );
+
+    const result = inspected.map((n) => {
       const containers = Object.entries(n.Containers || {}).map(([id, c]) => ({
         id,
         name: c.Name,

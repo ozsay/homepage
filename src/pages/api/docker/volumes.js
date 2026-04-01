@@ -15,19 +15,32 @@ export default async function handler(req, res) {
     }
 
     const docker = new Docker(dockerArgs.conn || dockerArgs);
-    const [volumeData, containers] = await Promise.all([
+    const [volumeData, containers, df] = await Promise.all([
       docker.listVolumes(),
       docker.listContainers({ all: true }),
+      docker.df().catch(() => null),
     ]);
 
     const volumes = volumeData?.Volumes || [];
 
-    // Count how many containers use each volume
-    const volumeUsage = {};
+    // Map volume name -> list of container names using it
+    const volumeContainers = {};
     for (const c of containers) {
+      const name = c.Names?.[0]?.replace(/^\//, "") ?? c.Id.slice(0, 12);
       for (const m of c.Mounts || []) {
         if (m.Type === "volume" && m.Name) {
-          volumeUsage[m.Name] = (volumeUsage[m.Name] || 0) + 1;
+          if (!volumeContainers[m.Name]) volumeContainers[m.Name] = [];
+          volumeContainers[m.Name].push(name);
+        }
+      }
+    }
+
+    // Map volume name -> size from docker system df
+    const volumeSizes = {};
+    if (df?.Volumes) {
+      for (const v of df.Volumes) {
+        if (v.Name && v.UsageData?.Size >= 0) {
+          volumeSizes[v.Name] = v.UsageData.Size;
         }
       }
     }
@@ -37,7 +50,9 @@ export default async function handler(req, res) {
       driver: v.Driver,
       mountpoint: v.Mountpoint,
       created: v.CreatedAt,
-      usedBy: volumeUsage[v.Name] || 0,
+      usedBy: volumeContainers[v.Name]?.length || 0,
+      containers: volumeContainers[v.Name] || [],
+      size: volumeSizes[v.Name] ?? null,
     }));
 
     return res.status(200).json(result);
