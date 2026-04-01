@@ -1,7 +1,14 @@
+import { useMemo, useState } from "react";
 import useSWR from "swr";
 
 const QUERY_CPU = "topk(10, rate(namedprocess_namegroup_cpu_seconds_total[5m]) * 100)";
-const QUERY_MEM = "topk(10, namedprocess_namegroup_memory_bytes{memtype=\"resident\"})";
+const QUERY_MEM = 'topk(10, namedprocess_namegroup_memory_bytes{memtype="resident"})';
+
+const COLUMNS = [
+  { key: "name", label: "Process", align: "left" },
+  { key: "cpu", label: "CPU %", align: "right" },
+  { key: "memory", label: "Memory", align: "right" },
+];
 
 function formatBytes(bytes) {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
@@ -11,54 +18,65 @@ function formatBytes(bytes) {
 }
 
 export default function ProcessTable() {
-  const now = Math.floor(Date.now() / 1000);
-  const cpuParams = new URLSearchParams({
-    query: QUERY_CPU,
-    start: (now - 60).toString(),
-    end: now.toString(),
-    step: "60",
-  });
-  const memParams = new URLSearchParams({
-    query: QUERY_MEM,
-    start: (now - 60).toString(),
-    end: now.toString(),
-    step: "60",
-  });
+  const [sortKey, setSortKey] = useState("cpu");
+  const [sortAsc, setSortAsc] = useState(false);
 
-  const { data: cpuData } = useSWR(`/api/metrics/history?${cpuParams}`, { refreshInterval: 30000 });
-  const { data: memData } = useSWR(`/api/metrics/history?${memParams}`, { refreshInterval: 30000 });
+  const cpuKey = `/api/metrics/history?query=${encodeURIComponent(QUERY_CPU)}`;
+  const memKey = `/api/metrics/history?query=${encodeURIComponent(QUERY_MEM)}`;
 
-  const processes = [];
-  const cpuResults = cpuData?.data?.result || [];
-  const memResults = memData?.data?.result || [];
+  const { data: cpuData } = useSWR(cpuKey, { refreshInterval: 30000 });
+  const { data: memData } = useSWR(memKey, { refreshInterval: 30000 });
 
-  const memMap = new Map();
-  for (const r of memResults) {
-    const name = r.metric.groupname || r.metric.name || "unknown";
-    const lastVal = r.values?.[r.values.length - 1]?.[1];
-    if (lastVal) memMap.set(name, parseFloat(lastVal));
-  }
+  const processes = useMemo(() => {
+    const list = [];
+    const cpuResults = cpuData?.data?.result || [];
+    const memResults = memData?.data?.result || [];
 
-  for (const r of cpuResults) {
-    const name = r.metric.groupname || r.metric.name || "unknown";
-    const lastVal = r.values?.[r.values.length - 1]?.[1];
-    if (lastVal) {
-      processes.push({
-        name,
-        cpu: parseFloat(lastVal),
-        memory: memMap.get(name) || 0,
-      });
+    const memMap = new Map();
+    for (const r of memResults) {
+      const name = r.metric.groupname || r.metric.name || "unknown";
+      const val = r.value?.[1];
+      if (val) memMap.set(name, parseFloat(val));
+    }
+
+    for (const r of cpuResults) {
+      const name = r.metric.groupname || r.metric.name || "unknown";
+      const val = r.value?.[1];
+      if (val) {
+        list.push({
+          name,
+          cpu: parseFloat(val),
+          memory: memMap.get(name) || 0,
+        });
+      }
+    }
+
+    return list;
+  }, [cpuData, memData]);
+
+  const sorted = useMemo(() => {
+    const dir = sortAsc ? 1 : -1;
+    return [...processes].sort((a, b) => {
+      if (sortKey === "name") return dir * a.name.localeCompare(b.name);
+      return dir * (a[sortKey] - b[sortKey]);
+    });
+  }, [processes, sortKey, sortAsc]);
+
+  function handleSort(key) {
+    if (key === sortKey) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortKey(key);
+      setSortAsc(key === "name");
     }
   }
 
-  processes.sort((a, b) => b.cpu - a.cpu);
-
-  const hasData = processes.length > 0;
+  const hasData = sorted.length > 0;
 
   return (
     <div className="rounded-md shadow-md bg-theme-100/20 dark:bg-white/5 backdrop-blur p-4">
       <p className="text-xs font-medium uppercase text-theme-500 dark:text-theme-400 mb-3">
-        Top Processes
+        Top Processes <span className="normal-case font-normal">(5m avg)</span>
       </p>
       {!hasData ? (
         <p className="text-xs text-theme-500 dark:text-theme-400">
@@ -71,24 +89,33 @@ export default function ProcessTable() {
           <table className="w-full text-sm text-left">
             <thead>
               <tr className="text-xs text-theme-500 dark:text-theme-400 border-b border-theme-200/20 dark:border-white/10">
-                <th className="pb-2 font-medium">Process</th>
-                <th className="pb-2 font-medium text-right">CPU %</th>
-                <th className="pb-2 font-medium text-right">Memory</th>
+                {COLUMNS.map((col) => (
+                  <th
+                    key={col.key}
+                    className={`pb-2 font-medium cursor-pointer select-none hover:text-theme-300 transition-colors ${col.align === "right" ? "text-right" : ""}`}
+                    onClick={() => handleSort(col.key)}
+                  >
+                    {col.label}
+                    {sortKey === col.key && (
+                      <span className="ml-1">{sortAsc ? "\u25b2" : "\u25bc"}</span>
+                    )}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {processes.slice(0, 10).map((p) => (
+              {sorted.slice(0, 10).map((p) => (
                 <tr
                   key={p.name}
                   className="border-b border-theme-200/10 dark:border-white/5 last:border-0"
                 >
-                  <td className="py-1.5 text-theme-700 dark:text-theme-200 font-mono text-xs">
+                  <td className="py-1.5 text-theme-700 dark:text-theme-200 font-mono text-xs truncate max-w-[200px]" title={p.name}>
                     {p.name}
                   </td>
-                  <td className="py-1.5 text-right text-theme-700 dark:text-theme-200 text-xs">
+                  <td className="py-1.5 text-right text-theme-700 dark:text-theme-200 text-xs whitespace-nowrap">
                     {p.cpu.toFixed(1)}%
                   </td>
-                  <td className="py-1.5 text-right text-theme-700 dark:text-theme-200 text-xs">
+                  <td className="py-1.5 text-right text-theme-700 dark:text-theme-200 text-xs whitespace-nowrap">
                     {formatBytes(p.memory)}
                   </td>
                 </tr>

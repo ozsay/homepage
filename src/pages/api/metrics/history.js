@@ -20,12 +20,16 @@ export default async function handler(req, res) {
   }
 
   try {
+    const isInstant = !start && !end && !step;
     const params = new URLSearchParams({ query });
-    if (start) params.set("start", start);
-    if (end) params.set("end", end);
-    if (step) params.set("step", step);
+    if (!isInstant) {
+      if (start) params.set("start", start);
+      if (end) params.set("end", end);
+      if (step) params.set("step", step);
+    }
 
-    const response = await fetch(`${prometheusUrl}/api/v1/query_range?${params}`);
+    const endpoint = isInstant ? "query" : "query_range";
+    const response = await fetch(`${prometheusUrl}/api/v1/${endpoint}?${params}`);
     if (!response.ok) {
       const body = await response.text();
       logger.error("Prometheus returned %d: %s", response.status, body);
