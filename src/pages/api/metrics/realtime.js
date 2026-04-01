@@ -46,6 +46,9 @@ function getAllMetricValues(metrics, name) {
   return metrics[name] || [];
 }
 
+// Store previous CPU snapshot for delta-based usage calculation
+let prevCpuSnapshot = null;
+
 function buildCpuData(metrics) {
   const cpuSeconds = getAllMetricValues(metrics, "node_cpu_seconds_total");
   const coreMap = new Map();
@@ -57,20 +60,54 @@ function buildCpuData(metrics) {
   }
 
   const cores = coreMap.size;
-  const perCore = [];
-  let totalIdle = 0;
-  let totalAll = 0;
+  const currentSnapshot = [...coreMap.entries()].sort((a, b) => a[0] - b[0]);
 
-  for (const [, modes] of [...coreMap.entries()].sort((a, b) => a[0] - b[0])) {
-    const idle = modes.idle || 0;
-    const all = Object.values(modes).reduce((s, v) => s + v, 0);
-    totalIdle += idle;
-    totalAll += all;
-    perCore.push(all > 0 ? Math.round((1 - idle / all) * 1000) / 10 : 0);
+  let perCore = [];
+  let totalUsage = 0;
+
+  if (prevCpuSnapshot && prevCpuSnapshot.length === currentSnapshot.length) {
+    // Compute delta between current and previous readings
+    let totalIdleDelta = 0;
+    let totalAllDelta = 0;
+
+    for (let i = 0; i < currentSnapshot.length; i++) {
+      const [, curModes] = currentSnapshot[i];
+      const [, prevModes] = prevCpuSnapshot[i];
+
+      const curIdle = curModes.idle || 0;
+      const prevIdle = prevModes.idle || 0;
+      const curAll = Object.values(curModes).reduce((s, v) => s + v, 0);
+      const prevAll = Object.values(prevModes).reduce((s, v) => s + v, 0);
+
+      const idleDelta = curIdle - prevIdle;
+      const allDelta = curAll - prevAll;
+
+      totalIdleDelta += idleDelta;
+      totalAllDelta += allDelta;
+      perCore.push(allDelta > 0 ? Math.round((1 - idleDelta / allDelta) * 1000) / 10 : 0);
+    }
+
+    totalUsage = totalAllDelta > 0 ? Math.round((1 - totalIdleDelta / totalAllDelta) * 1000) / 10 : 0;
+  } else {
+    // First request — fall back to cumulative average
+    let totalIdle = 0;
+    let totalAll = 0;
+
+    for (const [, modes] of currentSnapshot) {
+      const idle = modes.idle || 0;
+      const all = Object.values(modes).reduce((s, v) => s + v, 0);
+      totalIdle += idle;
+      totalAll += all;
+      perCore.push(all > 0 ? Math.round((1 - idle / all) * 1000) / 10 : 0);
+    }
+
+    totalUsage = totalAll > 0 ? Math.round((1 - totalIdle / totalAll) * 1000) / 10 : 0;
   }
 
+  prevCpuSnapshot = currentSnapshot;
+
   return {
-    usage: totalAll > 0 ? Math.round((1 - totalIdle / totalAll) * 1000) / 10 : 0,
+    usage: totalUsage,
     cores,
     perCore,
   };

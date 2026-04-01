@@ -24,13 +24,13 @@ function ChartContent({ range }) {
   const step = STEP_SECONDS[range] || 15;
 
   const rxParams = new URLSearchParams({
-    query: 'rate(node_network_receive_bytes_total{device!="lo"}[5m])',
+    query: 'sum(rate(node_network_receive_bytes_total{device!="lo"}[5m]))',
     start: start.toString(),
     end: now.toString(),
     step: step.toString(),
   });
   const txParams = new URLSearchParams({
-    query: 'rate(node_network_transmit_bytes_total{device!="lo"}[5m])',
+    query: 'sum(rate(node_network_transmit_bytes_total{device!="lo"}[5m]))',
     start: start.toString(),
     end: now.toString(),
     step: step.toString(),
@@ -69,8 +69,8 @@ function ChartContent({ range }) {
   }
 
   return (
-    <div className="h-48">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="h-48 flex flex-col">
+      <ResponsiveContainer width="100%" height="100%" className="flex-1 min-h-0">
         <LineChart data={chartData}>
           <XAxis
             dataKey="time"
