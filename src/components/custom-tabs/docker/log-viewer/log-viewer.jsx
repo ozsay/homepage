@@ -109,7 +109,7 @@ export default function LogViewer({ container, server }) {
   }, [lines, search]);
 
   return (
-    <div className="flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden">
       <LogControls
         autoScroll={autoScroll}
         setAutoScroll={(v) => {
@@ -128,7 +128,7 @@ export default function LogViewer({ container, server }) {
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="max-h-[32rem] overflow-y-auto font-mono text-xs p-2 bg-theme-900/5 dark:bg-black/20"
+        className="flex-1 overflow-y-auto font-mono text-xs p-2 bg-theme-900/5 dark:bg-black/20"
       >
         {filtered.map((line, i) => (
           // eslint-disable-next-line react/no-array-index-key

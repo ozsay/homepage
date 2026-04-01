@@ -1,3 +1,5 @@
+import { FiBox, FiGlobe, FiHardDrive, FiLayers } from "react-icons/fi";
+
 import ContainersGroup from "./containers/containers-group";
 import ImagesGroup from "./images/images-group";
 import NetworksGroup from "./networks/networks-group";
@@ -8,10 +10,10 @@ export default function Docker({ config }) {
 
   return (
     <div className="flex flex-wrap m-4 sm:m-8 sm:mt-4 items-start mb-2">
-      <ContainersGroup server={server} defaultOpen />
-      <ImagesGroup server={server} />
-      <NetworksGroup server={server} />
-      <VolumesGroup server={server} />
+      <ContainersGroup icon={FiBox} server={server} defaultOpen />
+      <ImagesGroup icon={FiLayers} server={server} />
+      <NetworksGroup icon={FiGlobe} server={server} />
+      <VolumesGroup icon={FiHardDrive} server={server} />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import classNames from "classnames";
 import { useEffect, useRef } from "react";
 import { MdKeyboardArrowDown } from "react-icons/md";
 
-export default function DockerGroup({ title, count, defaultOpen = false, children }) {
+export default function DockerGroup({ icon: Icon, title, count, defaultOpen = false, children }) {
   const panel = useRef();
 
   useEffect(() => {
@@ -16,6 +16,9 @@ export default function DockerGroup({ title, count, defaultOpen = false, childre
         {({ open }) => (
           <>
             <Disclosure.Button className="flex w-full select-none items-center group">
+              {Icon && (
+                <Icon className="mr-2 text-xl text-theme-800 dark:text-theme-300" />
+              )}
               <h2 className="flex text-theme-800 dark:text-theme-300 text-xl font-medium">
                 {title}
               </h2>

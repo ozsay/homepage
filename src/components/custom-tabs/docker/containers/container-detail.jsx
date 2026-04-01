@@ -11,8 +11,8 @@ export default function ContainerDetail({ container, server }) {
   const [activeTab, setActiveTab] = useState("Logs");
 
   return (
-    <div className="border-t border-theme-200/50 dark:border-white/10 mt-1 pt-2">
-      <div className="flex gap-1 px-2 mb-2">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex gap-1 px-3 py-2 border-b border-theme-200/50 dark:border-white/10">
         {TABS.map((tab) => (
           <button
             key={tab}
@@ -30,7 +30,7 @@ export default function ContainerDetail({ container, server }) {
         ))}
       </div>
 
-      <div className="min-h-[16rem]">
+      <div className="flex-1 overflow-hidden">
         {activeTab === "Logs" && <LogViewer container={container} server={server} />}
         {activeTab === "Inspect" && <ContainerInspect container={container} server={server} />}
         {activeTab === "Stats" && <ContainerStats container={container} server={server} />}
