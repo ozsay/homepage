@@ -218,17 +218,15 @@ export default function ImagesGroup({ icon, server }) {
               onChange={(e) => setFilter(e.target.value)}
               className="w-full px-3 py-1.5 text-sm rounded bg-theme-200/30 dark:bg-white/5 border border-theme-200/50 dark:border-white/10 text-theme-700 dark:text-theme-200 placeholder:text-theme-400 dark:placeholder:text-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-300 dark:focus:ring-white/20"
             />
-            {danglingCount > 0 && (
-              <button
-                type="button"
-                disabled={pruning}
-                onClick={handlePruneDangling}
-                className="flex items-center gap-1 w-full px-2 py-1 text-xs rounded text-rose-500 hover:bg-rose-500/10 transition-colors disabled:opacity-40"
-              >
-                <FiTrash2 className="text-[10px]" />
-                {pruning ? "Removing..." : `Remove dangling (${danglingCount})`}
-              </button>
-            )}
+            <button
+              type="button"
+              disabled={pruning || danglingCount === 0}
+              onClick={handlePruneDangling}
+              className="flex items-center gap-1 w-full px-2 py-1 text-xs rounded text-rose-500 hover:bg-rose-500/10 transition-colors disabled:opacity-40"
+            >
+              <FiTrash2 className="text-[10px]" />
+              {pruning ? "Pruning..." : `Prune ${danglingCount} image${danglingCount !== 1 ? "s" : ""}`}
+            </button>
             {pruneResult && (
               <div className="px-2 text-xs text-theme-500 dark:text-theme-400">{pruneResult}</div>
             )}

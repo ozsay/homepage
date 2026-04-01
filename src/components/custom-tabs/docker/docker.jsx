@@ -1,8 +1,9 @@
-import { FiBox, FiGlobe, FiHardDrive, FiLayers } from "react-icons/fi";
+import { FiBox, FiGlobe, FiHardDrive, FiLayers, FiServer } from "react-icons/fi";
 
 import ContainersGroup from "./containers/containers-group";
 import ImagesGroup from "./images/images-group";
 import NetworksGroup from "./networks/networks-group";
+import SystemGroup from "./system/system-group";
 import VolumesGroup from "./volumes/volumes-group";
 
 export default function Docker({ config }) {
@@ -14,6 +15,7 @@ export default function Docker({ config }) {
       <ImagesGroup icon={FiLayers} server={server} />
       <NetworksGroup icon={FiGlobe} server={server} />
       <VolumesGroup icon={FiHardDrive} server={server} />
+      <SystemGroup icon={FiServer} server={server} />
     </div>
   );
 }
