@@ -28,7 +28,6 @@ export default function ProcessTable() {
   const { data: memData } = useSWR(memKey, { refreshInterval: 30000 });
 
   const processes = useMemo(() => {
-    const list = [];
     const cpuResults = cpuData?.data?.result || [];
     const memResults = memData?.data?.result || [];
 
@@ -36,22 +35,26 @@ export default function ProcessTable() {
     for (const r of memResults) {
       const name = r.metric.groupname || r.metric.name || "unknown";
       const val = r.value?.[1];
-      if (val) memMap.set(name, parseFloat(val));
+      if (val) {
+        const parsed = parseFloat(val);
+        memMap.set(name, Math.max(memMap.get(name) || 0, parsed));
+      }
     }
 
+    const procMap = new Map();
     for (const r of cpuResults) {
       const name = r.metric.groupname || r.metric.name || "unknown";
       const val = r.value?.[1];
       if (val) {
-        list.push({
-          name,
-          cpu: parseFloat(val),
-          memory: memMap.get(name) || 0,
-        });
+        const parsed = parseFloat(val);
+        const existing = procMap.get(name);
+        if (!existing || parsed > existing.cpu) {
+          procMap.set(name, { name, cpu: parsed, memory: memMap.get(name) || 0 });
+        }
       }
     }
 
-    return list;
+    return [...procMap.values()];
   }, [cpuData, memData]);
 
   const sorted = useMemo(() => {
