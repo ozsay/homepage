@@ -18,6 +18,9 @@ const DEFAULT_INTERVALS = {
   "service:siteMonitor": 30000,
   proxy: 10000,
   "docker:containers": 10000,
+  "docker:images": 30000,
+  "docker:networks": 30000,
+  "docker:volumes": 30000,
   "status:docker": 30000,
   "status:docker-stats": 30000,
   "status:kubernetes": 30000,
@@ -104,6 +107,21 @@ function topicToURL(topic) {
   if (parts[0] === "docker" && parts[1] === "containers") {
     const server = parts[2] || "";
     return `/api/docker/containers?server=${encodeURIComponent(server)}`;
+  }
+
+  if (parts[0] === "docker" && parts[1] === "images") {
+    const server = parts[2] || "";
+    return `/api/docker/images?server=${encodeURIComponent(server)}`;
+  }
+
+  if (parts[0] === "docker" && parts[1] === "networks") {
+    const server = parts[2] || "";
+    return `/api/docker/networks?server=${encodeURIComponent(server)}`;
+  }
+
+  if (parts[0] === "docker" && parts[1] === "volumes") {
+    const server = parts[2] || "";
+    return `/api/docker/volumes?server=${encodeURIComponent(server)}`;
   }
 
   if (parts[0] === "service") {
