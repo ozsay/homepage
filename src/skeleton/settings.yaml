@@ -5,3 +5,10 @@
 providers:
   openweathermap: openweathermapapikey
   weatherapi: weatherapiapikey
+
+# Custom tabs render dedicated components instead of service/bookmark groups.
+# customTabs:
+#   - name: Host Metrics
+#     type: hostMetrics
+#   - name: Docker
+#     type: docker

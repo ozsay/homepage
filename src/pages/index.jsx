@@ -1,6 +1,7 @@
 /* eslint-disable react/no-array-index-key */
 import classNames from "classnames";
 import BookmarksGroup from "components/bookmarks/group";
+import CustomTabRenderer from "components/custom-tabs/renderer";
 import ErrorBoundary from "components/errorboundry";
 import QuickLaunch from "components/quicklaunch";
 import ServicesGroup from "components/services/group";
@@ -275,16 +276,19 @@ function Home({ initialSettings }) {
     };
   });
 
-  const tabs = useMemo(
-    () => [
-      ...new Set(
-        Object.keys(settings.layout ?? {})
-          .map((groupName) => settings.layout[groupName]?.tab?.toString())
-          .filter((group) => group),
-      ),
-    ],
-    [settings.layout],
-  );
+  const tabs = useMemo(() => {
+    const layoutTabs = Object.keys(settings.layout ?? {})
+      .map((groupName) => settings.layout[groupName]?.tab?.toString())
+      .filter(Boolean);
+
+    const customTabNames = (settings.customTabs ?? []).map((t) => t.name);
+
+    // When custom tabs exist but no layout tabs, prepend a "Dashboard" tab
+    // so users can navigate back to the main services/bookmarks view.
+    const baseTabs = customTabNames.length > 0 && layoutTabs.length === 0 ? ["Dashboard"] : layoutTabs;
+
+    return [...new Set([...baseTabs, ...customTabNames])];
+  }, [settings.layout, settings.customTabs]);
 
   useEffect(() => {
     if (!activeTab) {
@@ -294,6 +298,10 @@ function Home({ initialSettings }) {
   });
 
   const servicesAndBookmarksGroups = useMemo(() => {
+    const activeCustomTab = (settings.customTabs ?? []).find(
+      (t) => slugifyAndEncode(t.name) === activeTab,
+    );
+
     const tabGroupFilter = (g) => g && [activeTab, ""].includes(slugifyAndEncode(settings.layout?.[g.name]?.tab));
     const undefinedGroupFilter = (g) => settings.layout?.[g.name] === undefined;
 
@@ -329,6 +337,10 @@ function Home({ initialSettings }) {
             </ul>
           </div>
         )}
+        {activeCustomTab ? (
+          <CustomTabRenderer type={activeCustomTab.type} config={activeCustomTab} />
+        ) : (
+          <>
         {layoutGroups.length > 0 && (
           <div key="layoutGroups" id="layout-groups" className="flex flex-wrap m-4 sm:m-8 sm:mt-4 items-start mb-2">
             {layoutGroups.map((group) =>
@@ -384,6 +396,8 @@ function Home({ initialSettings }) {
             ))}
           </div>
         )}
+          </>
+        )}
       </>
     );
   }, [
@@ -401,6 +415,7 @@ function Home({ initialSettings }) {
     settings.groupsInitiallyCollapsed,
     settings.bookmarksStyle,
     initialSettings.layout,
+    settings.customTabs,
   ]);
 
   return (
