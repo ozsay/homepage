@@ -18,8 +18,9 @@ function MiniChart({ data, max, color, label, currentValue }) {
     if (!canvas || data.length === 0) return;
 
     const ctx = canvas.getContext("2d");
-    const { width, height } = canvas;
     const dpr = window.devicePixelRatio || 1;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
