@@ -15,10 +15,35 @@ export default async function handler(req, res) {
     }
 
     const docker = new Docker(dockerArgs.conn || dockerArgs);
-    const networkList = await docker.listNetworks();
+    const [networkList, allContainers] = await Promise.all([
+      docker.listNetworks(),
+      docker.listContainers({ all: true }),
+    ]);
 
     if (!Array.isArray(networkList)) {
       return res.status(500).json({ error: "query failed" });
+    }
+
+    // Build map: container id/name -> containers sharing its network namespace
+    // Containers with NetworkMode "container:<name_or_id>" share the parent's network
+    const childrenByParent = {};
+    const containerIdToName = {};
+
+    for (const c of allContainers) {
+      const name = c.Names?.[0]?.replace(/^\//, "") ?? c.Id.slice(0, 12);
+      containerIdToName[c.Id] = name;
+      containerIdToName[name] = name;
+    }
+
+    for (const c of allContainers) {
+      const mode = c.HostConfig?.NetworkMode || "";
+      if (mode.startsWith("container:")) {
+        const parentRef = mode.slice("container:".length);
+        const parentName = containerIdToName[parentRef] || parentRef;
+        const childName = c.Names?.[0]?.replace(/^\//, "") ?? c.Id.slice(0, 12);
+        if (!childrenByParent[parentName]) childrenByParent[parentName] = [];
+        childrenByParent[parentName].push(childName);
+      }
     }
 
     // Inspect each network to get connected containers
@@ -32,7 +57,11 @@ export default async function handler(req, res) {
         name: c.Name,
         ip: c.IPv4Address?.split("/")[0] || "",
         mac: c.MacAddress,
+        children: childrenByParent[c.Name] || [],
       }));
+
+      // Total count includes children
+      const totalCount = containers.reduce((sum, c) => sum + 1 + c.children.length, 0);
 
       return {
         id: n.Id,
@@ -42,7 +71,7 @@ export default async function handler(req, res) {
         subnet: n.IPAM?.Config?.[0]?.Subnet || null,
         gateway: n.IPAM?.Config?.[0]?.Gateway || null,
         containers,
-        containerCount: containers.length,
+        containerCount: totalCount,
       };
     });
 

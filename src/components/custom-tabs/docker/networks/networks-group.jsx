@@ -45,12 +45,19 @@ function NetworkContent({ network }) {
           {network.subnet && <KV label="Subnet" value={network.subnet} />}
           {network.gateway && <KV label="Gateway" value={network.gateway} />}
         </Section>
-        <Section title={`Containers (${network.containers?.length || 0})`}>
+        <Section title={`Containers (${network.containerCount || 0})`}>
           {network.containers?.length > 0 ? (
             network.containers.map((c) => (
-              <div key={c.id} className="flex gap-2 py-0.5">
-                <span className="font-medium text-theme-600 dark:text-theme-300">{c.name}</span>
-                <span>{c.ip}</span>
+              <div key={c.id}>
+                <div className="flex py-0.5">
+                  <span className="font-medium text-theme-600 dark:text-theme-300 w-48 shrink-0 truncate">{c.name}</span>
+                  <span className="font-mono">{c.ip}</span>
+                </div>
+                {c.children?.map((child) => (
+                  <div key={child} className="flex py-0.5 pl-4">
+                    <span className="text-theme-500 dark:text-theme-400 w-44 shrink-0 truncate">{child}</span>
+                  </div>
+                ))}
               </div>
             ))
           ) : (
