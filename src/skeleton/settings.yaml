@@ -10,5 +10,8 @@ providers:
 # customTabs:
 #   - name: Host Metrics
 #     type: hostMetrics
+#     options:
+#       nodeExporterUrl: http://192.168.1.106:9100
+#       prometheusUrl: http://prometheus:9090
 #   - name: Docker
 #     type: docker

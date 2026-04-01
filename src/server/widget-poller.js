@@ -10,6 +10,7 @@ function setPort(port) {
 // Default polling intervals by topic prefix
 const DEFAULT_INTERVALS = {
   resource: 1500,
+  "metrics:realtime": 2000,
   glances: 1500,
   kubernetes: 1500,
   longhorn: 1500,
@@ -94,6 +95,10 @@ function topicToURL(topic) {
 
   if (parts[0] === "longhorn") {
     return `/api/widgets/longhorn`;
+  }
+
+  if (parts[0] === "metrics" && parts[1] === "realtime") {
+    return `/api/metrics/realtime`;
   }
 
   if (parts[0] === "docker" && parts[1] === "containers") {
