@@ -6,6 +6,8 @@ const QUERY_MEM = 'topk(10, namedprocess_namegroup_memory_bytes{memtype="residen
 
 const COLUMNS = [
   { key: "name", label: "Process", align: "left" },
+  { key: "container", label: "Container", align: "left" },
+  { key: "pid", label: "PID", align: "right" },
   { key: "cpu", label: "CPU %", align: "right" },
   { key: "memory", label: "Memory", align: "right" },
 ];
@@ -26,10 +28,12 @@ export default function ProcessTable() {
 
   const { data: cpuData } = useSWR(cpuKey, { refreshInterval: 30000 });
   const { data: memData } = useSWR(memKey, { refreshInterval: 30000 });
+  const { data: containerMap } = useSWR("/api/docker/process-map", { refreshInterval: 60000 });
 
   const processes = useMemo(() => {
     const cpuResults = cpuData?.data?.result || [];
     const memResults = memData?.data?.result || [];
+    const cMap = containerMap || {};
 
     const memMap = new Map();
     for (const r of memResults) {
@@ -49,19 +53,28 @@ export default function ProcessTable() {
         const parsed = parseFloat(val);
         const existing = procMap.get(name);
         if (!existing || parsed > existing.cpu) {
-          procMap.set(name, { name, cpu: parsed, memory: memMap.get(name) || 0 });
+          const match = cMap[name.toLowerCase()] || null;
+          procMap.set(name, {
+            name,
+            cpu: parsed,
+            memory: memMap.get(name) || 0,
+            container: match?.container || null,
+            pid: match?.pid || null,
+          });
         }
       }
     }
 
     return [...procMap.values()];
-  }, [cpuData, memData]);
+  }, [cpuData, memData, containerMap]);
 
   const sorted = useMemo(() => {
     const dir = sortAsc ? 1 : -1;
     return [...processes].sort((a, b) => {
-      if (sortKey === "name") return dir * a.name.localeCompare(b.name);
-      return dir * (a[sortKey] - b[sortKey]);
+      if (sortKey === "name" || sortKey === "container") {
+        return dir * (a[sortKey] || "").localeCompare(b[sortKey] || "");
+      }
+      return dir * ((parseFloat(a[sortKey]) || 0) - (parseFloat(b[sortKey]) || 0));
     });
   }, [processes, sortKey, sortAsc]);
 
@@ -114,6 +127,19 @@ export default function ProcessTable() {
                 >
                   <td className="py-1.5 text-theme-700 dark:text-theme-200 font-mono text-xs truncate max-w-[200px]" title={p.name}>
                     {p.name}
+                  </td>
+                  <td className="py-1.5 text-theme-700 dark:text-theme-200 font-mono text-xs truncate max-w-[160px]" title={p.container || ""}>
+                    {p.container ? (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-blue-400">&#x2B22;</span>
+                        {p.container}
+                      </span>
+                    ) : (
+                      <span className="text-theme-500 dark:text-theme-600">&mdash;</span>
+                    )}
+                  </td>
+                  <td className="py-1.5 text-right text-theme-700 dark:text-theme-200 font-mono text-xs whitespace-nowrap">
+                    {p.pid ? p.pid : <span className="text-theme-500 dark:text-theme-600">&mdash;</span>}
                   </td>
                   <td className="py-1.5 text-right text-theme-700 dark:text-theme-200 text-xs whitespace-nowrap">
                     {p.cpu.toFixed(1)}%
