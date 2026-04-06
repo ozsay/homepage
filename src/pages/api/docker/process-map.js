@@ -43,8 +43,9 @@ export default async function handler(req, res) {
           const cmdIndex = titles.findIndex((t) => /^(CMD|COMMAND)$/i.test(t));
           if (cmdIndex < 0 || !top.Processes) return;
 
-          // Register container name itself as a lookup key
-          addEntry(cname, cname, null);
+          // Register container name with main process PID
+          const mainPid = pidIndex >= 0 && top.Processes.length > 0 ? top.Processes[0][pidIndex] : null;
+          addEntry(cname, cname, mainPid);
 
           for (const proc of top.Processes) {
             const cmd = proc[cmdIndex] || "";

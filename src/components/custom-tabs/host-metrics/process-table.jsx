@@ -12,6 +12,32 @@ const COLUMNS = [
   { key: "memory", label: "Memory", align: "right" },
 ];
 
+function pickBest(entries, pn) {
+  if (entries.length === 1) return entries[0];
+  // Prefer entry whose container name relates to the process name
+  const nameMatch = entries.find((e) => {
+    const cn = e.container.toLowerCase();
+    return cn.includes(pn) || pn.includes(cn);
+  });
+  if (nameMatch) return nameMatch;
+  // Prefer entries with a PID
+  return entries.find((e) => e.pid) || entries[0];
+}
+
+function resolveContainer(processName, cMap) {
+  const pn = processName.toLowerCase();
+  // Exact key match
+  const exact = cMap[pn];
+  if (exact?.length) return pickBest(exact, pn);
+  // Token-based: split process name by delimiters, try each token as a key
+  const tokens = pn.split(/[-_.\s(]+/).filter((t) => t.length >= 3);
+  for (const token of tokens) {
+    const match = cMap[token];
+    if (match?.length) return pickBest(match, pn);
+  }
+  return null;
+}
+
 function formatBytes(bytes) {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
   if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
@@ -53,15 +79,7 @@ export default function ProcessTable() {
         const parsed = parseFloat(val);
         const existing = procMap.get(name);
         if (!existing || parsed > existing.cpu) {
-          const entries = cMap[name.toLowerCase()] || [];
-          const pn = name.toLowerCase();
-          const match =
-            entries.length === 1
-              ? entries[0]
-              : entries.find((e) => {
-                  const cn = e.container.toLowerCase();
-                  return cn.includes(pn) || pn.includes(cn);
-                }) || entries[0] || null;
+          const match = resolveContainer(name, cMap);
           procMap.set(name, {
             name,
             cpu: parsed,
