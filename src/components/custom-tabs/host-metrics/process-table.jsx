@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 
 const QUERY_CPU = "topk(10, rate(namedprocess_namegroup_cpu_seconds_total[5m]) * 100)";
-const QUERY_MEM = 'topk(10, namedprocess_namegroup_memory_bytes{memtype="resident"})';
+const QUERY_MEM = 'namedprocess_namegroup_memory_bytes{memtype="resident"}';
 
 const COLUMNS = [
   { key: "name", label: "Process", align: "left" },
@@ -53,7 +53,15 @@ export default function ProcessTable() {
         const parsed = parseFloat(val);
         const existing = procMap.get(name);
         if (!existing || parsed > existing.cpu) {
-          const match = cMap[name.toLowerCase()] || null;
+          const entries = cMap[name.toLowerCase()] || [];
+          const pn = name.toLowerCase();
+          const match =
+            entries.length === 1
+              ? entries[0]
+              : entries.find((e) => {
+                  const cn = e.container.toLowerCase();
+                  return cn.includes(pn) || pn.includes(cn);
+                }) || entries[0] || null;
           procMap.set(name, {
             name,
             cpu: parsed,
