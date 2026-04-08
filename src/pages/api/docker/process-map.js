@@ -1,4 +1,4 @@
-import { readdir, readFile, access } from "fs/promises";
+import { readdir, readFile, readlink, access } from "fs/promises";
 import path from "path";
 
 import Docker from "dockerode";
@@ -64,19 +64,43 @@ async function buildFromProc(processMap, containerIdMap) {
         const cmdline = await readFile(path.join(HOST_PROC, pid, "cmdline"), "utf8");
         if (!cmdline) return; // kernel thread
 
-        const argv0 = cmdline.split("\0")[0] || "";
-        const binary = argv0.split("/").pop().replace(/:$/, "");
-        if (!binary || SKIP_BINARIES.has(binary)) return;
+        // Collect all name variants for this process
+        const names = new Set();
 
-        addEntry(processMap, binary, container.name, pid, "proc");
+        // 1. cmdline argv[0] basename
+        const argv0 = cmdline.split("\0")[0] || "";
+        const cmdBinary = argv0.split("/").pop().replace(/:$/, "");
+        if (cmdBinary) names.add(cmdBinary);
+
+        // 2. kernel comm name (may differ from cmdline, 15-char max)
+        try {
+          const comm = (await readFile(path.join(HOST_PROC, pid, "comm"), "utf8")).trim();
+          if (comm) names.add(comm);
+        } catch { /* ignored */ }
+
+        // 3. exe readlink — matches process-exporter {{.ExeBase}}
+        //    May work in rootless Docker (same user), gracefully skip if not
+        try {
+          const exePath = await readlink(path.join(HOST_PROC, pid, "exe"));
+          const exeBase = exePath.split("/").pop();
+          if (exeBase) names.add(exeBase);
+        } catch { /* expected in rootless for non-owned processes */ }
+
+        // Register all unique names for this container
+        let hasInterpreter = false;
+        for (const name of names) {
+          if (SKIP_BINARIES.has(name)) continue;
+          addEntry(processMap, name, container.name, pid, "proc");
+          if (INTERPRETERS.has(name)) hasInterpreter = true;
+        }
 
         // For interpreters, also register the script/module name
-        if (INTERPRETERS.has(binary)) {
+        if (hasInterpreter) {
           const args = cmdline.split("\0").filter(Boolean);
           for (let i = 1; i < args.length; i++) {
             if (!args[i].startsWith("-")) {
               const script = args[i].split("/").pop().replace(/\.\w+$/, "");
-              if (script && script !== binary) {
+              if (script && !names.has(script)) {
                 addEntry(processMap, script, container.name, pid, "proc");
               }
               break;
@@ -165,6 +189,14 @@ export default async function handler(req, res) {
     if (!usedProc) {
       await buildFromDockerTop(processMap, docker, containers);
     }
+
+    // Add container ID → name mapping for cgroup-based lookups
+    const containerIds = {};
+    for (const c of containers) {
+      const cname = c.Names?.[0]?.replace(/^\//, "") ?? c.Id.slice(0, 12);
+      containerIds[c.Id] = cname;
+    }
+    processMap._containerIds = containerIds;
 
     return res.status(200).json(processMap);
   } catch (e) {

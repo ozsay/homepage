@@ -36,10 +36,20 @@ const COLUMNS = [
   { key: "memory", label: "Memory", align: "right" },
 ];
 
-const TYPE_PRIORITY = { name: 0, compose: 1, image: 2, script: 3, binary: 4 };
+const TYPE_PRIORITY = { proc: 0, name: 1, compose: 2, image: 3, script: 4, binary: 5 };
 
-function cleanGroupname(raw) {
-  return raw.replace(/\s*\(.*\)\s*$/, "").trim();
+const DOCKER_CGROUP_RE = /docker[/-]([a-f0-9]{64})/;
+
+function parseGroupname(raw) {
+  const pipeIdx = raw.indexOf("|");
+  if (pipeIdx < 0) {
+    // No cgroup info — legacy format
+    return { display: raw.replace(/\s*\(.*\)\s*$/, "").trim(), containerId: null };
+  }
+  const display = raw.substring(0, pipeIdx).replace(/\s*\(.*\)\s*$/, "").trim();
+  const cgroupPart = raw.substring(pipeIdx + 1);
+  const match = DOCKER_CGROUP_RE.exec(cgroupPart);
+  return { display, containerId: match?.[1] || null };
 }
 
 function pickBest(entries, pn) {
@@ -60,13 +70,27 @@ function pickBest(entries, pn) {
   });
   if (nameMatch) return nameMatch;
 
-  // Ambiguous — return null instead of guessing
+  // For proc entries (cgroup-authoritative), combine all containers
+  if (sorted[0].type === "proc") {
+    const procEntries = entries.filter((e) => e.type === "proc");
+    const unique = [...new Set(procEntries.map((e) => e.container))];
+    if (unique.length === 1) return procEntries[0];
+    return { container: unique.join(", "), pid: null, type: "proc" };
+  }
+
+  // For heuristic entries, return null to avoid guessing
   return null;
 }
 
-function resolveContainer(processName, cMap) {
-  const cleaned = cleanGroupname(processName);
-  const pn = cleaned.toLowerCase();
+function resolveContainer(displayName, containerId, cMap) {
+  // Direct cgroup match — authoritative, from process-exporter {{.Cgroups}}
+  if (containerId && cMap._containerIds) {
+    const name = cMap._containerIds[containerId];
+    if (name) return { container: name, pid: null, type: "cgroup" };
+  }
+
+  // Fall back to name-based lookup via /proc or docker-top map
+  const pn = displayName.toLowerCase();
   const entries = cMap[pn];
   if (entries?.length) return pickBest(entries, pn);
   return null;
@@ -99,30 +123,34 @@ export default function ProcessTable() {
 
     const memMap = new Map();
     for (const r of memResults) {
-      const name = r.metric.groupname || r.metric.name || "unknown";
+      const raw = r.metric.groupname || r.metric.name || "unknown";
+      const { display } = parseGroupname(raw);
       const val = r.value?.[1];
       if (val) {
         const parsed = parseFloat(val);
-        memMap.set(name, Math.max(memMap.get(name) || 0, parsed));
+        // Use raw key so each container's memory is tracked separately
+        memMap.set(raw, Math.max(memMap.get(raw) || 0, parsed));
       }
     }
 
     const procMap = new Map();
     for (const r of cpuResults) {
-      const name = r.metric.groupname || r.metric.name || "unknown";
+      const raw = r.metric.groupname || r.metric.name || "unknown";
+      const { display, containerId } = parseGroupname(raw);
       const val = r.value?.[1];
       if (val) {
         const parsed = parseFloat(val);
-        const existing = procMap.get(name);
+        // Use raw key to keep per-container entries separate
+        const existing = procMap.get(raw);
         if (!existing || parsed > existing.cpu) {
-          // Use metric-level container label if available (from cgroup config)
           const metricContainer =
             r.metric.container_name || r.metric.container || null;
-          const match = metricContainer ? null : resolveContainer(name, cMap);
-          procMap.set(name, {
-            name,
+          const match = metricContainer ? null : resolveContainer(display, containerId, cMap);
+          procMap.set(raw, {
+            key: raw,
+            name: display,
             cpu: parsed,
-            memory: memMap.get(name) || 0,
+            memory: memMap.get(raw) || 0,
             container: metricContainer || match?.container || null,
             pid: match?.pid || null,
           });
@@ -205,7 +233,7 @@ export default function ProcessTable() {
             <tbody>
               {sorted.slice(0, 10).map((p) => (
                 <tr
-                  key={p.name}
+                  key={p.key || p.name}
                   className="border-b border-theme-200/10 dark:border-white/5 last:border-0"
                 >
                   <td className="py-1.5 text-theme-700 dark:text-theme-200 font-mono text-xs truncate max-w-[200px]" title={p.name}>
