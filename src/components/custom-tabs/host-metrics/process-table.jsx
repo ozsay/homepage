@@ -86,7 +86,12 @@ function resolveContainer(displayName, containerId, cMap) {
   // Direct cgroup match — authoritative, from process-exporter {{.Cgroups}}
   if (containerId && cMap._containerIds) {
     const name = cMap._containerIds[containerId];
-    if (name) return { container: name, pid: null, type: "cgroup" };
+    if (name) {
+      // Find PID from /proc entries for this container
+      const entries = cMap[displayName.toLowerCase()];
+      const pidEntry = entries?.find((e) => e.container === name && e.pid);
+      return { container: name, pid: pidEntry?.pid || null, type: "cgroup" };
+    }
   }
 
   // Fall back to name-based lookup via /proc or docker-top map
