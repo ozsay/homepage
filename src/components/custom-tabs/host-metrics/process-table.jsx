@@ -151,13 +151,14 @@ export default function ProcessTable() {
           const metricContainer =
             r.metric.container_name || r.metric.container || null;
           const match = metricContainer ? null : resolveContainer(display, containerId, cMap);
+          const pid = match?.pid || cMap._hostPids?.[display.toLowerCase()] || null;
           procMap.set(raw, {
             key: raw,
             name: display,
             cpu: parsed,
             memory: memMap.get(raw) || 0,
             container: metricContainer || match?.container || null,
-            pid: match?.pid || null,
+            pid,
           });
         }
       }

@@ -55,11 +55,8 @@ async function buildFromProc(processMap, containerIdMap) {
     pids.map(async (pid) => {
       try {
         const cgroupContent = await readFile(path.join(HOST_PROC, pid, "cgroup"), "utf8");
-        const match = DOCKER_CGROUP_RE.exec(cgroupContent);
-        if (!match) return; // not a Docker process
-
-        const container = containerIdMap[match[1]];
-        if (!container) return; // unknown container
+        const cgMatch = DOCKER_CGROUP_RE.exec(cgroupContent);
+        const container = cgMatch ? containerIdMap[cgMatch[1]] : null;
 
         const cmdline = await readFile(path.join(HOST_PROC, pid, "cmdline"), "utf8");
         if (!cmdline) return; // kernel thread
@@ -86,11 +83,19 @@ async function buildFromProc(processMap, containerIdMap) {
           if (exeBase) names.add(exeBase);
         } catch { /* expected in rootless for non-owned processes */ }
 
-        // Register all unique names for this container
+        // Register all unique names
         let hasInterpreter = false;
         for (const name of names) {
           if (SKIP_BINARIES.has(name)) continue;
-          addEntry(processMap, name, container.name, pid, "proc");
+          if (container) {
+            addEntry(processMap, name, container.name, pid, "proc");
+          } else {
+            // Host process — store PID for display
+            if (!processMap._hostPids) processMap._hostPids = {};
+            if (!processMap._hostPids[name.toLowerCase()]) {
+              processMap._hostPids[name.toLowerCase()] = pid;
+            }
+          }
           if (INTERPRETERS.has(name)) hasInterpreter = true;
         }
 
@@ -101,7 +106,11 @@ async function buildFromProc(processMap, containerIdMap) {
             if (!args[i].startsWith("-")) {
               const script = args[i].split("/").pop().replace(/\.\w+$/, "");
               if (script && !names.has(script)) {
-                addEntry(processMap, script, container.name, pid, "proc");
+                if (container) {
+                  addEntry(processMap, script, container.name, pid, "proc");
+                } else if (!processMap._hostPids[script.toLowerCase()]) {
+                  processMap._hostPids[script.toLowerCase()] = pid;
+                }
               }
               break;
             }
