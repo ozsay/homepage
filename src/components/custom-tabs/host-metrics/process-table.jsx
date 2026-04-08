@@ -1,8 +1,32 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 
-const QUERY_CPU = "topk(10, rate(namedprocess_namegroup_cpu_seconds_total[5m]) * 100)";
-const QUERY_MEM = 'namedprocess_namegroup_memory_bytes{memtype="resident"}';
+const MODES = {
+  live: {
+    label: "Live",
+    cpu: "topk(10, rate(namedprocess_namegroup_cpu_seconds_total[1m]) * 100)",
+    mem: 'namedprocess_namegroup_memory_bytes{memtype="resident"}',
+    refresh: 10000,
+  },
+  "1h": {
+    label: "1h",
+    cpu: "topk(10, rate(namedprocess_namegroup_cpu_seconds_total[1h]) * 100)",
+    mem: 'avg_over_time(namedprocess_namegroup_memory_bytes{memtype="resident"}[1h])',
+    refresh: 60000,
+  },
+  "12h": {
+    label: "12h",
+    cpu: "topk(10, rate(namedprocess_namegroup_cpu_seconds_total[12h]) * 100)",
+    mem: 'avg_over_time(namedprocess_namegroup_memory_bytes{memtype="resident"}[12h])',
+    refresh: 120000,
+  },
+  "24h": {
+    label: "24h",
+    cpu: "topk(10, rate(namedprocess_namegroup_cpu_seconds_total[24h]) * 100)",
+    mem: 'avg_over_time(namedprocess_namegroup_memory_bytes{memtype="resident"}[24h])',
+    refresh: 300000,
+  },
+};
 
 const COLUMNS = [
   { key: "name", label: "Process", align: "left" },
@@ -12,29 +36,39 @@ const COLUMNS = [
   { key: "memory", label: "Memory", align: "right" },
 ];
 
+const TYPE_PRIORITY = { name: 0, compose: 1, image: 2, script: 3, binary: 4 };
+
+function cleanGroupname(raw) {
+  return raw.replace(/\s*\(.*\)\s*$/, "").trim();
+}
+
 function pickBest(entries, pn) {
   if (entries.length === 1) return entries[0];
-  // Prefer entry whose container name relates to the process name
+
+  // Prefer higher-confidence key types
+  const sorted = [...entries].sort(
+    (a, b) => (TYPE_PRIORITY[a.type] ?? 9) - (TYPE_PRIORITY[b.type] ?? 9),
+  );
+  if ((TYPE_PRIORITY[sorted[0].type] ?? 9) < (TYPE_PRIORITY[sorted[1].type] ?? 9)) {
+    return sorted[0];
+  }
+
+  // Among same-type entries, prefer container name that relates to process name
   const nameMatch = entries.find((e) => {
     const cn = e.container.toLowerCase();
     return cn.includes(pn) || pn.includes(cn);
   });
   if (nameMatch) return nameMatch;
-  // Prefer entries with a PID
-  return entries.find((e) => e.pid) || entries[0];
+
+  // Ambiguous — return null instead of guessing
+  return null;
 }
 
 function resolveContainer(processName, cMap) {
-  const pn = processName.toLowerCase();
-  // Exact key match
-  const exact = cMap[pn];
-  if (exact?.length) return pickBest(exact, pn);
-  // Token-based: split process name by delimiters, try each token as a key
-  const tokens = pn.split(/[-_.\s(]+/).filter((t) => t.length >= 3);
-  for (const token of tokens) {
-    const match = cMap[token];
-    if (match?.length) return pickBest(match, pn);
-  }
+  const cleaned = cleanGroupname(processName);
+  const pn = cleaned.toLowerCase();
+  const entries = cMap[pn];
+  if (entries?.length) return pickBest(entries, pn);
   return null;
 }
 
@@ -46,14 +80,16 @@ function formatBytes(bytes) {
 }
 
 export default function ProcessTable() {
+  const [mode, setMode] = useState("live");
   const [sortKey, setSortKey] = useState("cpu");
   const [sortAsc, setSortAsc] = useState(false);
 
-  const cpuKey = `/api/metrics/history?query=${encodeURIComponent(QUERY_CPU)}`;
-  const memKey = `/api/metrics/history?query=${encodeURIComponent(QUERY_MEM)}`;
+  const cfg = MODES[mode];
+  const cpuKey = `/api/metrics/history?query=${encodeURIComponent(cfg.cpu)}`;
+  const memKey = `/api/metrics/history?query=${encodeURIComponent(cfg.mem)}`;
 
-  const { data: cpuData } = useSWR(cpuKey, { refreshInterval: 30000 });
-  const { data: memData } = useSWR(memKey, { refreshInterval: 30000 });
+  const { data: cpuData } = useSWR(cpuKey, { refreshInterval: cfg.refresh });
+  const { data: memData } = useSWR(memKey, { refreshInterval: cfg.refresh });
   const { data: containerMap } = useSWR("/api/docker/process-map", { refreshInterval: 60000 });
 
   const processes = useMemo(() => {
@@ -79,12 +115,15 @@ export default function ProcessTable() {
         const parsed = parseFloat(val);
         const existing = procMap.get(name);
         if (!existing || parsed > existing.cpu) {
-          const match = resolveContainer(name, cMap);
+          // Use metric-level container label if available (from cgroup config)
+          const metricContainer =
+            r.metric.container_name || r.metric.container || null;
+          const match = metricContainer ? null : resolveContainer(name, cMap);
           procMap.set(name, {
             name,
             cpu: parsed,
             memory: memMap.get(name) || 0,
-            container: match?.container || null,
+            container: metricContainer || match?.container || null,
             pid: match?.pid || null,
           });
         }
@@ -117,9 +156,27 @@ export default function ProcessTable() {
 
   return (
     <div className="rounded-md shadow-md bg-theme-100/20 dark:bg-white/5 backdrop-blur p-4">
-      <p className="text-xs font-medium uppercase text-theme-500 dark:text-theme-400 mb-3">
-        Top Processes <span className="normal-case font-normal">(5m avg)</span>
-      </p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-medium uppercase text-theme-500 dark:text-theme-400">
+          Top Processes
+        </p>
+        <div className="flex gap-1">
+          {Object.entries(MODES).map(([key, m]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setMode(key)}
+              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                mode === key
+                  ? "bg-theme-500/20 text-theme-300"
+                  : "text-theme-500 dark:text-theme-500 hover:text-theme-300"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
       {!hasData ? (
         <p className="text-xs text-theme-500 dark:text-theme-400">
           No process data available. Requires{" "}
