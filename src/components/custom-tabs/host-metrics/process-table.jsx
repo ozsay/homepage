@@ -44,9 +44,9 @@ function parseGroupname(raw) {
   const pipeIdx = raw.indexOf("|");
   if (pipeIdx < 0) {
     // No cgroup info — legacy format
-    return { display: raw.replace(/\s*\(.*\)\s*$/, "").trim(), containerId: null };
+    return { display: raw.replace(/\s*\(.*$/, "").trim(), containerId: null };
   }
-  const display = raw.substring(0, pipeIdx).replace(/\s*\(.*\)\s*$/, "").trim();
+  const display = raw.substring(0, pipeIdx).replace(/\s*\(.*$/, "").trim();
   const cgroupPart = raw.substring(pipeIdx + 1);
   const match = DOCKER_CGROUP_RE.exec(cgroupPart);
   return { display, containerId: match?.[1] || null };
